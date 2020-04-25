@@ -16,35 +16,49 @@ RESERVED_REGION_SIZE_IN_SECTORS_SIZE = 2
 
 
 FAT_BOOT_SECTOR = {
-    'bytes_in_sector': 0,
-    'sectors_in_cluster': 0,
-    'reserved_region_size_in_sectors': 0
+    'bytes_in_sector': {
+        'offset': 11,
+        'size': 2,
+        'value': 0
+    },
+    'sectors_in_cluster': {
+        'offset': 13,
+        'size': 1,
+        'value': 0
+    },
+    'reserved_region_size_in_sectors': {
+        'offset': 14,
+        'size': 2,
+        'value': 0
+    }
 }
+
+
+STRUCT_UNPACK_FORMAT_LETTERS = {
+    1: 'B',
+    2: 'H'
+}
+
+
+def read_field_from_dump(dump, field_info):
+    dump.seek(field_info['offset'])
+    field_raw = dump.read(field_info['size'])
+    field_info['value'] = struct.unpack(
+        STRUCT_UNPACK_FORMAT_LETTERS[field_info['size']], field_raw
+    )[0]
 
 
 def read_boot_sector(fat_dump_file):
     # read bytes_in_sector
-    fat_dump_file.seek(BYTES_IN_SECTOR_OFFSET)
-    bytes_in_sector_raw = fat_dump_file.read(BYTES_IN_SECTOR_SIZE)
-    FAT_BOOT_SECTOR['bytes_in_sector'] = struct.unpack(
-        'H', bytes_in_sector_raw
-    )[0]
+    read_field_from_dump(fat_dump_file, FAT_BOOT_SECTOR['bytes_in_sector'])
 
     # read sectors_in_cluster
-    fat_dump_file.seek(SECTORS_IN_CLUSTER_OFFSET)
-    sectors_in_cluster_raw = fat_dump_file.read(SECTORS_IN_CLUSTER_SIZE)
-    FAT_BOOT_SECTOR['sectors_in_cluster'] = struct.unpack(
-        'B', sectors_in_cluster_raw
-    )[0]
+    read_field_from_dump(fat_dump_file, FAT_BOOT_SECTOR['sectors_in_cluster'])
 
     # read reserved_region_size_in_sectors
-    fat_dump_file.seek(RESERVED_REGION_SIZE_IN_SECTORS_OFFSET)
-    reserved_region_size_in_sectors_raw = fat_dump_file.read(
-        RESERVED_REGION_SIZE_IN_SECTORS_SIZE
+    read_field_from_dump(
+        fat_dump_file, FAT_BOOT_SECTOR['reserved_region_size_in_sectors']
     )
-    FAT_BOOT_SECTOR['reserved_region_size_in_sectors'] = struct.unpack(
-        'H', reserved_region_size_in_sectors_raw
-    )[0]
 
 
 if __name__ == "__main__":
