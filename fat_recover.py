@@ -11,9 +11,14 @@ BYTES_IN_SECTOR_SIZE = 2
 SECTORS_IN_CLUSTER_OFFSET = 13
 SECTORS_IN_CLUSTER_SIZE = 1
 
+RESERVED_REGION_SIZE_IN_SECTORS_OFFSET = 14
+RESERVED_REGION_SIZE_IN_SECTORS_SIZE = 2
+
+
 FAT_BOOT_SECTOR = {
     'bytes_in_sector': 0,
-    'sectors_in_cluster': 0
+    'sectors_in_cluster': 0,
+    'reserved_region_size_in_sectors': 0
 }
 
 
@@ -30,6 +35,15 @@ def read_boot_sector(fat_dump_file):
     sectors_in_cluster_raw = fat_dump_file.read(SECTORS_IN_CLUSTER_SIZE)
     FAT_BOOT_SECTOR['sectors_in_cluster'] = struct.unpack(
         'B', sectors_in_cluster_raw
+    )[0]
+
+    # read reserved_region_size_in_sectors
+    fat_dump_file.seek(RESERVED_REGION_SIZE_IN_SECTORS_OFFSET)
+    reserved_region_size_in_sectors_raw = fat_dump_file.read(
+        RESERVED_REGION_SIZE_IN_SECTORS_SIZE
+    )
+    FAT_BOOT_SECTOR['reserved_region_size_in_sectors'] = struct.unpack(
+        'H', reserved_region_size_in_sectors_raw
     )[0]
 
 
