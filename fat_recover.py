@@ -1,6 +1,15 @@
 #!/usr/bin/env python3
 # coding: utf-8
 
+# fat32.dd info
+#
+# Offsets:
+# FAT1          4000 
+# FAT2          c9000
+# ROOT_DIR      18e000
+# 
+
+
 
 import struct
 
@@ -31,6 +40,69 @@ FAT_BOOT_SECTOR = {
         'size': 4,
         'value': 0
     }
+}
+
+
+DIRECROTY_ENTRY = {
+    'allocation_flag': {
+        'offset': 0,
+        'size': 1,
+        'value': 0
+    },
+    'filename': {
+        'offset': 1,
+        'size': 10,
+        'value': ''
+    },
+    'attributes': {
+        'offset': 11,
+        'size': 1,
+        'value': 0
+    },
+    'first_2_bytes_of_start_cluster_number': {
+        'offset': 20,
+        'size': 2,
+        'value': 0
+    },
+    'second_2_bytes_of_start_cluster_number': {
+        'offset': 26,
+        'size': 2,
+        'value': 0
+    },
+    'filesize': {
+        'offset': 28,
+        'size': 4,
+        'value': 0
+    }
+}
+
+
+LONG_FILENAME_DIRECTORY_ENTRY = {
+    'allocation_flag': {
+        'offset': 0,
+        'size': 1,
+        'value': 0
+    },
+    '1_5_letters_of_filename': {
+        'offset': 1,
+        'size': 10,
+        'value': ''
+    },
+    'attributes': {
+        'offset': 11,
+        'size': 1,
+        'value': 0
+    },
+    '6_11_letters_of_filename': {
+        'offset': 14,
+        'size': 12,
+        'value': ''
+    },
+    '12_13_letters_of_filename': {
+        'offset': 28,
+        'size': 4,
+        'value': ''
+    },
 }
 
 
@@ -70,6 +142,10 @@ def read_boot_sector(fat_dump_file):
     read_field_from_dump(
         fat_dump_file, FAT_BOOT_SECTOR['fat_size_in_sectors']
     )
+
+
+
+
 
 if __name__ == "__main__":
     fat_dump_file = open('fat32.dd', 'rb')
