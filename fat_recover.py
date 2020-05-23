@@ -14,7 +14,9 @@ import struct
 import copy
 
 
+FAT_ENTRY_SIZE = 32
 ROOT_DITECTORY_CLUSTER_NUMBER = 2
+FIRST_CLUSTER_OFFSET = 0
 
 FAT_BOOT_SECTOR = {
     'bytes_in_sector': {
@@ -54,7 +56,8 @@ DIRECROTY_ENTRY = {
     'filename': {
         'offset': 1,
         'size': 10,
-        'value': ''
+        'value': '',
+        'enc': 'ascii'
     },
     'attributes': {
         'offset': 11,
@@ -88,7 +91,8 @@ LONG_FILENAME_DIRECTORY_ENTRY = {
     '1_5_letters_of_filename': {
         'offset': 1,
         'size': 10,
-        'value': ''
+        'value': '',
+        'enc': 'utf-16'
     },
     'attributes': {
         'offset': 11,
@@ -98,12 +102,14 @@ LONG_FILENAME_DIRECTORY_ENTRY = {
     '6_11_letters_of_filename': {
         'offset': 14,
         'size': 12,
-        'value': ''
+        'value': '',
+        'enc': 'utf-16'
     },
     '12_13_letters_of_filename': {
         'offset': 28,
         'size': 4,
-        'value': ''
+        'value': '',
+        'enc': 'utf-16'
     },
 }
 
@@ -118,9 +124,14 @@ STRUCT_UNPACK_FORMAT_LETTERS = {
 def read_field_from_dump(dump, field_info):
     dump.seek(field_info['offset'])
     field_raw = dump.read(field_info['size'])
-    field_info['value'] = struct.unpack(
-        STRUCT_UNPACK_FORMAT_LETTERS[field_info['size']], field_raw
-    )[0]
+    if 'enc' in field_info:
+        field_info['value'] = struct.unpack(
+            '{}s'.format(field_info['size']), field_raw
+        )[0].decode(field_info['enc'])
+    else:
+        field_info['value'] = struct.unpack(
+            STRUCT_UNPACK_FORMAT_LETTERS[field_info['size']], field_raw
+        )[0]
 
 
 def read_fields_from_dump(dump, fields_info):
@@ -129,6 +140,8 @@ def read_fields_from_dump(dump, fields_info):
 
 
 def read_boot_sector(fat_dump_file):
+    global FIRST_CLUSTER_OFFSET
+
     # read bytes_in_sector
     read_field_from_dump(fat_dump_file, FAT_BOOT_SECTOR['bytes_in_sector'])
 
@@ -150,17 +163,39 @@ def read_boot_sector(fat_dump_file):
         fat_dump_file, FAT_BOOT_SECTOR['fat_size_in_sectors']
     )
 
+    FIRST_CLUSTER_OFFSET = (
+        FAT_BOOT_SECTOR['reserved_region_size_in_sectors']['value'] +
+        FAT_BOOT_SECTOR['number_of_fat_copies']['value'] *
+            FAT_BOOT_SECTOR['fat_size_in_sectors']['value']
+    ) * FAT_BOOT_SECTOR['bytes_in_sector']['value']
+
 
 def get_cluster_offset(cluster_number):
-    pass
+    return FIRST_CLUSTER_OFFSET + (
+        cluster_number - ROOT_DITECTORY_CLUSTER_NUMBER
+    ) * FAT_BOOT_SECTOR['sectors_in_cluster']['value'] * \
+        FAT_BOOT_SECTOR['bytes_in_sector']['value']
 
 
-def is_end_cluster(cluster_number):
-    pass
+def read_cluster_fat_entry(dump, cluster_number):
+    fat_entry = {
+        'offset': FAT_BOOT_SECTOR['reserved_region_size_in_sectors']['value'] +
+                  cluster_number * FAT_ENTRY_SIZE,
+        'size': FAT_ENTRY_SIZE // 8,
+        'value': 0
+    }
+
+    read_field_from_dump(dump, fat_entry)
+
+    return fat_entry['value']
 
 
-def get_next_cluster_number(cluster_number):
-    pass
+def is_end_cluster(dump, cluster_number):
+    return read_cluster_fat_entry(dump, cluster_number) > 0x0ffffff8
+
+
+def get_next_cluster_number(dump, cluster_number):
+    return read_cluster_fat_entry(dump, cluster_number)
 
 
 def get_shifted_copy_of_fields_info(fields_info, shift):
@@ -174,8 +209,8 @@ def get_shifted_copy_of_fields_info(fields_info, shift):
 
 def read_directory(dump, first_cluster_number):
     cluster_number = first_cluster_number
-    cluster_size_in_bytes = FAT_BOOT_SECTOR['bytes_in_sector'] * \
-        FAT_BOOT_SECTOR['sectors_in_cluster']
+    cluster_size_in_bytes = FAT_BOOT_SECTOR['bytes_in_sector']['value'] * \
+        FAT_BOOT_SECTOR['sectors_in_cluster']['value']
 
     result = []
 
@@ -186,6 +221,7 @@ def read_directory(dump, first_cluster_number):
         cluster_offset = get_cluster_offset(cluster_number)
 
         dir_entry_offset = 0
+        lfn_entries = []
         
         while dir_entry_offset < cluster_size_in_bytes:
             # cycle by directory entries
@@ -203,6 +239,8 @@ def read_directory(dump, first_cluster_number):
                     cluster_offset + dir_entry_offset
                 )
                 read_fields_from_dump(dump, lfn_entry)
+
+                lfn_entries.append(lfn_entry)
             else:
                 file_entry = get_shifted_copy_of_fields_info(
                     DIRECROTY_ENTRY,
@@ -210,15 +248,19 @@ def read_directory(dump, first_cluster_number):
                 )
                 read_fields_from_dump(dump, file_entry)
 
+                result.append(lfn_entries + [file_entry])
+
+                lfn_entries = []
+
             dir_entry_offset += 32
 
 
-        if is_end_cluster(cluster_number):
+        if is_end_cluster(dump, cluster_number):
             break
 
-        cluster_number = get_next_cluster_number(cluster_number)
+        cluster_number = get_next_cluster_number(dump, cluster_number)
 
-        
+    return result
 
 
 if __name__ == "__main__":
@@ -226,7 +268,7 @@ if __name__ == "__main__":
 
     read_boot_sector(fat_dump_file)
     # DEBUG
-    print(FAT_BOOT_SECTOR)
-
+    #print(FAT_BOOT_SECTOR)
+    print(read_directory(fat_dump_file, 2))
 
     fat_dump_file.close()
