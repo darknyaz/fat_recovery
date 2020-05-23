@@ -10,9 +10,11 @@
 # 
 
 
-
 import struct
+import copy
 
+
+ROOT_DITECTORY_CLUSTER_NUMBER = 2
 
 FAT_BOOT_SECTOR = {
     'bytes_in_sector': {
@@ -121,6 +123,11 @@ def read_field_from_dump(dump, field_info):
     )[0]
 
 
+def read_fields_from_dump(dump, fields_info):
+    for field_info in fields_info.values():
+        read_field_from_dump(dump, field_info)
+
+
 def read_boot_sector(fat_dump_file):
     # read bytes_in_sector
     read_field_from_dump(fat_dump_file, FAT_BOOT_SECTOR['bytes_in_sector'])
@@ -144,7 +151,74 @@ def read_boot_sector(fat_dump_file):
     )
 
 
+def get_cluster_offset(cluster_number):
+    pass
 
+
+def is_end_cluster(cluster_number):
+    pass
+
+
+def get_next_cluster_number(cluster_number):
+    pass
+
+
+def get_shifted_copy_of_fields_info(fields_info, shift):
+    result = copy.deepcopy(fields_info)
+
+    for field_info in result.values():
+        field_info['offset'] += shift
+        
+    return result
+
+
+def read_directory(dump, first_cluster_number):
+    cluster_number = first_cluster_number
+    cluster_size_in_bytes = FAT_BOOT_SECTOR['bytes_in_sector'] * \
+        FAT_BOOT_SECTOR['sectors_in_cluster']
+
+    result = []
+
+    while True:
+        # cycle by clusters
+
+        # get cluster offset
+        cluster_offset = get_cluster_offset(cluster_number)
+
+        dir_entry_offset = 0
+        
+        while dir_entry_offset < cluster_size_in_bytes:
+            # cycle by directory entries
+
+            attribute = {
+                'offset': cluster_offset + dir_entry_offset + 11,
+                'size': 1,
+                'value': 0
+            }
+            read_field_from_dump(dump, attribute)
+
+            if attribute['value'] == 0x0f:
+                lfn_entry = get_shifted_copy_of_fields_info(
+                    LONG_FILENAME_DIRECTORY_ENTRY,
+                    cluster_offset + dir_entry_offset
+                )
+                read_fields_from_dump(dump, lfn_entry)
+            else:
+                file_entry = get_shifted_copy_of_fields_info(
+                    DIRECROTY_ENTRY,
+                    cluster_offset + dir_entry_offset
+                )
+                read_fields_from_dump(dump, file_entry)
+
+            dir_entry_offset += 32
+
+
+        if is_end_cluster(cluster_number):
+            break
+
+        cluster_number = get_next_cluster_number(cluster_number)
+
+        
 
 
 if __name__ == "__main__":
