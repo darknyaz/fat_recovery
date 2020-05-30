@@ -12,9 +12,11 @@
 
 import struct
 import copy
+import json
 
 
 FAT_ENTRY_SIZE = 32
+FAT_ENTRY_SIZE_IN_BYTES = FAT_ENTRY_SIZE // 8
 ROOT_DITECTORY_CLUSTER_NUMBER = 2
 FIRST_CLUSTER_OFFSET = 0
 
@@ -179,9 +181,10 @@ def get_cluster_offset(cluster_number):
 
 def read_cluster_fat_entry(dump, cluster_number):
     fat_entry = {
-        'offset': FAT_BOOT_SECTOR['reserved_region_size_in_sectors']['value'] +
-                  cluster_number * FAT_ENTRY_SIZE,
-        'size': FAT_ENTRY_SIZE // 8,
+        'offset': FAT_BOOT_SECTOR['reserved_region_size_in_sectors']['value'] *
+                      FAT_BOOT_SECTOR['bytes_in_sector']['value'] +
+                  cluster_number * FAT_ENTRY_SIZE_IN_BYTES,
+        'size': FAT_ENTRY_SIZE_IN_BYTES,
         'value': 0
     }
 
@@ -213,6 +216,7 @@ def read_directory(dump, first_cluster_number):
         FAT_BOOT_SECTOR['sectors_in_cluster']['value']
 
     result = []
+    lfn_entries = []
 
     while True:
         # cycle by clusters
@@ -221,7 +225,6 @@ def read_directory(dump, first_cluster_number):
         cluster_offset = get_cluster_offset(cluster_number)
 
         dir_entry_offset = 0
-        lfn_entries = []
         
         while dir_entry_offset < cluster_size_in_bytes:
             # cycle by directory entries
@@ -269,6 +272,6 @@ if __name__ == "__main__":
     read_boot_sector(fat_dump_file)
     # DEBUG
     #print(FAT_BOOT_SECTOR)
-    print(read_directory(fat_dump_file, 2))
+    print(json.dumps(read_directory(fat_dump_file, 2)))
 
     fat_dump_file.close()
